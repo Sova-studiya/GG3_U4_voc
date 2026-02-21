@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>English Full Stack</title>
+    <style>
+        :root {
+            --primary: #6366f1; --success: #22c55e; --danger: #ef4444;
+            --bg: #f1f5f9; --text: #1e293b;
+        }
+        body {
+            font-family: -apple-system, system-ui, sans-serif;
+            background: var(--bg); margin: 0; display: flex;
+            flex-direction: column; align-items: center; justify-content: center;
+            min-height: 100vh; overflow: hidden; touch-action: manipulation;
+        }
+        .header { position: fixed; top: 20px; display: flex; gap: 10px; z-index: 10; }
+        .stat { background: white; padding: 8px 16px; border-radius: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); font-weight: 700; font-size: 0.9rem; }
+
+        .stack-container {
+            position: relative; width: 90%; max-width: 350px; height: 480px;
+            perspective: 1000px;
+        }
+
+        .card {
+            position: absolute; width: 100%; height: 100%;
+            transition: transform 0.5s cubic-bezier(0.23, 1, 0.32, 1), opacity 0.3s;
+            transform-style: preserve-3d; cursor: pointer;
+        }
+        .card.is-flipped { transform: rotateY(180deg); }
+
+        .card-face {
+            position: absolute; width: 100%; height: 100%;
+            backface-visibility: hidden; border-radius: 25px;
+            display: flex; flex-direction: column; padding: 25px;
+            box-sizing: border-box; background: white;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+
+        .card-front { justify-content: center; align-items: center; text-align: center; }
+        .cat-tag { position: absolute; top: 20px; font-size: 0.65rem; text-transform: uppercase; color: #94a3b8; letter-spacing: 1px; }
+        .word-ru { font-size: 1.6rem; color: var(--text); font-weight: 800; }
+
+        .card-back { transform: rotateY(180deg); justify-content: flex-start; text-align: left; overflow-y: auto; }
+        .word-en { font-size: 1.8rem; color: var(--primary); font-weight: 800; margin: 5px 0; }
+        .phonetic { color: #64748b; font-size: 1rem; margin-bottom: 15px; font-family: monospace; }
+        .ex-list { border-top: 2px solid #f8fafc; padding-top: 10px; }
+        .ex-item { font-size: 0.85rem; color: #475569; margin-bottom: 8px; font-style: italic; line-height: 1.3; }
+
+        .controls { display: flex; gap: 20px; margin-top: 40px; }
+        .btn {
+            border: none; padding: 18px 30px; border-radius: 18px;
+            color: white; font-weight: 800; font-size: 1rem; cursor: pointer;
+        }
+        .btn-no { background: var(--danger); }
+        .btn-yes { background: var(--success); }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <div class="stat" style="color: var(--success)">Знаю: <span id="s-yes">0</span></div>
+        <div class="stat" style="color: var(--primary)">Осталось: <span id="s-rem">0</span></div>
+    </div>
+
+    <div class="stack-container" id="stack"></div>
+
+    <div class="controls">
+        <button class="btn btn-no" onclick="handleAction(false)">Не знаю</button>
+        <button class="btn btn-yes" onclick="handleAction(true)">Знаю</button>
+    </div>
+
+    <script>
+        const allWords = [
+            // 4.1
+            {c: "4.1", r: "Блендер", e: "Blender", p: "/ˈblendə/", x: ["Put fruit in the blender.", "The blender is noisy.", "Clean the blender."]},
+            {c: "4.1", r: "DVD-плеер", e: "DVD player", p: "/ˌdiːviː ˈdiː ˌpleɪə/", x: ["Connect the DVD player.", "Put the disc in.", "It's an old DVD player."]},
+            {c: "4.1", r: "Эл. зубная щетка", e: "Electric toothbrush", p: "/ɪˌlektrɪk ˈtuːθbrʌʃ/", x: ["I use an electric toothbrush.", "Charge the toothbrush.", "It's a good toothbrush."]},
+            {c: "4.1", r: "Игровая консоль", e: "Games console", p: "/ˈɡeɪmz ˈkɒnsəʊl/", x: ["Turn on the games console.", "I love my games console.", "Is the console new?"]},
+            {c: "4.1", r: "Фен", e: "Hairdryer", p: "/ˈheəˌdraɪə/", x: ["The hairdryer is broken.", "Where is the hairdryer?", "I need a hairdryer."]},
+            {c: "4.1", r: "Микроволновка", e: "Microwave oven", p: "/ˌmaɪkrəweɪv ˈʌvən/", x: ["Heat it in the microwave.", "The microwave is fast.", "Open the microwave."]},
+            {c: "4.1", r: "Пульт", e: "Remote control", p: "/rɪˌməʊt kənˈtrəʊl/", x: ["Pass the remote control.", "Where's the remote?", "Press the button."]},
+            {c: "4.1", r: "Смарт ТВ", e: "Smart TV", p: "/ˌsmɑːt ˌtiːˈviː/", x: ["We bought a smart TV.", "Is it a smart TV?", "Connect the smart TV."]},
+            {c: "4.1", r: "Тостер", e: "Toaster", p: "/ˈtəʊstə/", x: ["The toaster is hot.", "Put bread in the toaster.", "Clean the toaster."]},
+            {c: "4.1", r: "USB-флешка", e: "USB stick", p: "/ˌjuː es ˈbiː stɪk/", x: ["Save it on a USB stick.", "I lost my USB stick.", "Plug in the USB stick."]},
+            {c: "4.1 Tech", r: "Включить в розетку", e: "Plug in", p: "/ˌplʌɡ ˈɪn/", x: ["Plug in the toaster.", "Can I plug it in?", "Plug it in now."]},
+            {c: "4.1 Tech", r: "Выключить", e: "Turn off", p: "/ˌtɜːn ˈɒf/", x: ["Turn off the light.", "Turn off the TV.", "Please turn it off."]},
+            {c: "4.1 Tech", r: "Включить", e: "Turn on", p: "/ˌtɜːn ˈɒn/", x: ["Turn on the radio.", "Turn on the oven.", "Can you turn it on?"]},
+            {c: "4.1 Tech", r: "Выключить из розетки", e: "Unplug", p: "/ʌnˈplʌɡ/", x: ["Unplug the iron.", "Always unplug it.", "Did you unplug it?"]},
+            {c: "4.1", r: "Проводить опрос", e: "Do a survey", p: "/ˌduː ə ˈsɜːveɪ/", x: ["Let's do a survey.", "They do a survey.", "We did a survey."]},
+            {c: "4.1", r: "Нажать", e: "Press", p: "/pres/", x: ["Press the button.", "Don't press that.", "Press 'Enter'."]},
+            // 4.2
+            {c: "4.2", r: "Зацени!", e: "Check this out!", p: "/ˌtʃek ðɪs ˈaʊt/", x: ["Check this out! Wow!", "Hey, check this out.", "Look at this!"]},
+            {c: "4.2", r: "Честно!", e: "Honest!", p: "/ˈɒnɪst/", x: ["I'm being honest.", "It's true, honest!", "Be honest with me."]},
+            {c: "4.2", r: "Ты шутишь", e: "You’re kidding", p: "/ˌjə ˈkɪdɪŋ/", x: ["You're kidding! No!", "Are you kidding?", "You're kidding, right?"]},
+            {c: "4.2", r: "Настольная игра", e: "Board game", p: "/ˈbɔːd ɡeɪm/", x: ["Play a board game.", "I love board games.", "Buy a board game."]},
+            {c: "4.2", r: "Съемочная группа", e: "Film crew", p: "/ˈfɪlm kruː/", x: ["The film crew is here.", "He's in a film crew.", "A busy film crew."]},
+            // 4.3
+            {c: "4.3", r: "Сломать", e: "Break", p: "/breɪk/", x: ["Don't break it.", "Did it break?", "Machines break."]},
+            {c: "4.3", r: "Кнопка", e: "Button", p: "/ˈbʌtn/", x: ["Push the button.", "The button is red.", "A small button."]},
+            {c: "4.3", r: "Изобретать", e: "Invent", p: "/ɪnˈvent/", x: ["Who invented this?", "I want to invent.", "He invented a tool."]},
+            {c: "4.3", r: "Изобретение", e: "Invention", p: "/ɪnˈvenʃən/", x: ["A great invention.", "Cool invention!", "History of inventions."]},
+            {c: "4.3", r: "Почтальон", e: "Postman", p: "/ˈpəʊstmən/", x: ["The postman is here.", "Wait for the postman.", "Postman's bag."]},
+            {c: "4.3", r: "Толкать/Нажать", e: "Push", p: "/pʊʃ/", x: ["Push the door.", "Push the button.", "Don't push me."]},
+            {c: "4.3", r: "Сэндвичница", e: "Snack maker", p: "/ˈsnæk ˌmeɪkə/", x: ["Use the snack maker.", "A new snack maker.", "I love my snack maker."]},
+            {c: "4.3", r: "Шторм", e: "Storm", p: "/stɔːm/", x: ["A big storm.", "The storm is loud.", "Scared of the storm."]},
+            // 4.4
+            {c: "4.4", r: "Что случилось?", e: "What happened?", p: "/wɒt ˈhæpənd/", x: ["Tell me what happened.", "What happened here?", "Did it happen?"]},
+            {c: "4.4", r: "Что не так?", e: "What’s wrong?", p: "/wɒts rɒŋ/", x: ["Tell me what's wrong.", "Is something wrong?", "What is wrong?"]},
+            {c: "4.4", r: "Ты выглядишь расстроенным", e: "You look upset.", p: "/jə lʊk ʌpˈset/", x: ["You look upset. Why?", "Oh, you look upset.", "Stop, don't be upset."]},
+            {c: "4.4", r: "Ты выглядишь обеспокоенным", e: "You look worried.", p: "/jə lʊk ˈwʌrid/", x: ["You look worried. OK?", "Why look worried?", "Relax, don't be worried."]},
+            {c: "4.4", r: "Мне жаль это слышать", e: "I’m sorry to hear that!", p: "/aɪm ˈsɒri/", x: ["Oh! I’m sorry to hear that!", "So sorry to hear that.", "I am sorry."]},
+            {c: "4.4", r: "Это ужасно!", e: "Oh, that’s terrible!", p: "/ðæts ˈterəbl/", x: ["That's terrible! No!", "How terrible!", "It's a terrible news."]},
+            {c: "4.4", r: "Какая жалость", e: "That’s a shame.", p: "/ðæts ə ʃeɪm/", x: ["That's a shame, really.", "What a shame!", "Oh, that's a shame."]},
+            {c: "4.4", r: "Уронить", e: "Drop", p: "/drɒp/", x: ["Don't drop the glass.", "I dropped my keys.", "Did you drop it?"]},
+            {c: "4.4", r: "Сушить волосы", e: "Dry my hair", p: "/draɪ maɪ heə/", x: ["I need to dry my hair.", "Dry my hair now.", "How to dry my hair?"]},
+            {c: "4.4", r: "Везет тебе!", e: "Lucky you!", p: "/ˈlʌki juː/", x: ["You won? Lucky you!", "Lucky you! Wow.", "Oh, lucky you."]},
+            {c: "4.4", r: "Опоздать на автобус", e: "Miss the bus", p: "/mɪs ðə bʌs/", x: ["I missed the bus.", "Don't miss the bus.", "Hurry, the bus!"]},
+            {c: "4.4", r: "Чинить", e: "Repair", p: "/rɪˈpeə/", x: ["Repair the car.", "Can you repair it?", "Repair my phone."]},
+            // 4.5
+            {c: "4.5", r: "Приложение", e: "App", p: "/æp/", x: ["Download the app.", "The app is free.", "Open the app now."]},
+            {c: "4.5", r: "Батарея", e: "Battery", p: "/ˈbætəri/", x: ["My battery is dead.", "Charge the battery.", "Low battery."]},
+            {c: "4.5", r: "Повербанк", e: "Portable charger", p: "/ˌpɔːtəbəl ˈtʃɑːdʒə/", x: ["Use a portable charger.", "I have a charger.", "Is the charger full?"]},
+            {c: "4.5", r: "Рингтон", e: "Ringtone", p: "/ˈrɪŋtəʊn/", x: ["Change the ringtone.", "Loud ringtone.", "I like your ringtone."]},
+            {c: "4.5", r: "Сенсорный экран", e: "Touch screen", p: "/tʌtʃ skriːn/", x: ["Clean the touch screen.", "It's a touch screen.", "The screen works."]},
+            {c: "4.5", r: "Вай-фай", e: "Wi-Fi", p: "/ˈwaɪfaɪ/", x: ["What's the Wi-Fi?", "No Wi-Fi here.", "Connect to Wi-Fi."]},
+            {c: "4.5", r: "Мобильник", e: "Cell phone", p: "/ˈsel fəʊn/", x: ["My cell phone is new.", "Where's your cell phone?", "Turn off the cell phone."]},
+            {c: "4.5", r: "Подключать", e: "Connect", p: "/kəˈnekt/", x: ["Connect the wires.", "Can I connect?", "Connect to internet."]},
+            {c: "4.5", r: "Отличаться от", e: "Different from", p: "/ˈdɪfərənt frəm/", x: ["It's different from that.", "Am I different?", "Different from mine."]},
+            {c: "4.5", r: "Ручной", e: "Hand-held", p: "/ˈhænd held/", x: ["A hand-held device.", "Hand-held game.", "It is hand-held."]},
+            {c: "4.5", r: "Длиться", e: "Last", p: "/lɑːst/", x: ["It lasts long.", "How long does it last?", "The show lasts an hour."]},
+            {c: "4.5", r: "Моб. звонок", e: "Mobile phone call", p: "/ˌməʊbaɪl ˌfəʊn ˈkɔːl/", x: ["Answer the call.", "A mobile phone call.", "Make a phone call."]},
+            {c: "4.5", r: "Офис", e: "Office", p: "/ˈɒfɪs/", x: ["I'm in the office.", "Go to the office.", "A big office."]},
+            {c: "4.5", r: "Конкурент", e: "Rival company", p: "/ˌraɪvəl ˈkʌmpəni/", x: ["A rival company.", "They are rivals.", "Work for a rival."]},
+            {c: "4.5", r: "Весить", e: "Weigh", p: "/weɪ/", x: ["How much do you weigh?", "Weigh the bag.", "It weighs a lot."]},
+            {c: "4.5", r: "Работать на", e: "Work for", p: "/wɜːk fə/", x: ["I work for him.", "Who do you work for?", "Work for Google."]},
+            // 4.6
+            {c: "4.6", r: "Опаздывать", e: "Be late", p: "/bi leɪt/", x: ["Don't be late!", "I'm always late.", "Why are you late?"]},
+            {c: "4.6", r: "Сесть в автобус", e: "Get on a bus", p: "/ˌɡet ɒn ə ˈbʌs/", x: ["Get on a bus now.", "I saw him get on a bus.", "Let's get on the bus."]},
+            {c: "4.6", r: "Главное событие", e: "Main event", p: "/ˌmeɪn ɪˈvent/", x: ["The main event.", "Start the main event.", "What is the main event?"]},
+            {c: "Writing", r: "Наконец", e: "Finally", p: "/ˈfaɪnəli/", x: ["Finally! Done.", "Finally, he is here.", "Finally, we won."]},
+            {c: "Writing", r: "Сначала", e: "First", p: "/fɜːst/", x: ["First, do this.", "First, hello.", "Who's first?"]},
+            {c: "Writing", r: "Затем", e: "Then", p: "/ðen/", x: ["Then go home.", "Eat, then sleep.", "What then?"]}
+        ];
+
+        let queue = [...allWords].sort(() => Math.random() - 0.5);
+        let scoreYes = 0;
+
+        function renderCard() {
+            const stack = document.getElementById('stack');
+            stack.innerHTML = '';
+            if (queue.length === 0) {
+                stack.innerHTML = '<div class="word-ru" style="font-size:1.2rem">Все слова выучены! 🎉</div>';
+                return;
+            }
+            const item = queue[0];
+            const card = document.createElement('div');
+            card.className = 'card';
+            card.id = 'current-card';
+            card.onclick = () => flipCard(item.e);
+            card.innerHTML = `
+                <div class="card-face card-front">
+                    <span class="cat-tag">${item.c}</span>
+                    <div class="word-ru">${item.r}</div>
+                </div>
+                <div class="card-face card-back">
+                    <div class="word-en">${item.e}</div>
+                    <div class="phonetic">${item.p}</div>
+                    <div class="ex-list">${item.x.map(ex => `<div class="ex-item">• ${ex}</div>`).join('')}</div>
+                </div>`;
+            stack.appendChild(card);
+            document.getElementById('s-rem').textContent = queue.length;
+        }
+
+        function flipCard(word) {
+            const card = document.getElementById('current-card');
+            if(!card.classList.contains('is-flipped')) {
+                card.classList.add('is-flipped');
+                const speech = new SpeechSynthesisUtterance(word);
+                speech.lang = 'en-GB';
+                window.speechSynthesis.speak(speech);
+            }
+        }
+
+        function handleAction(known) {
+            const card = document.getElementById('current-card');
+            if (!card) return;
+            if (known) {
+                card.style.transform = 'translateX(600px) rotate(30deg)';
+                card.style.opacity = '0';
+                scoreYes++;
+                document.getElementById('s-yes').textContent = scoreYes;
+                queue.shift();
+            } else {
+                card.style.transform = 'translateX(-600px) rotate(-30deg)';
+                card.style.opacity = '0';
+                queue.push(queue.shift());
+            }
+            setTimeout(renderCard, 400);
+        }
+        renderCard();
+    </script>
+</body>
+</html>
